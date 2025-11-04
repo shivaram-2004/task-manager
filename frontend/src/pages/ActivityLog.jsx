@@ -40,7 +40,8 @@ export default function ActivityLog() {
   const filtered = activities.filter(
     (log) =>
       log.action?.toLowerCase().includes(search.toLowerCase()) ||
-      log.actorName?.toLowerCase().includes(search.toLowerCase())
+      log.actorName?.toLowerCase().includes(search.toLowerCase()) ||
+      log.comment?.toLowerCase().includes(search.toLowerCase())
   );
 
   if (role !== "admin") {
@@ -66,14 +67,14 @@ export default function ActivityLog() {
     >
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          🕒 My Activity Log
+          🕒 Activity Log
         </Typography>
         <TextField
-          placeholder="Search activity..."
+          placeholder="Search by user, action, or comment..."
           size="small"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          sx={{ width: 260 }}
+          sx={{ width: 280 }}
         />
       </Stack>
 
@@ -104,13 +105,31 @@ export default function ActivityLog() {
                 <ListItem alignItems="flex-start">
                   <ListItemText
                     primary={
-                      <Typography sx={{ fontWeight: 500 }}>
-                        {act.action || "Performed an action"}
-                      </Typography>
+                      <>
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {act.actorName || "Unknown User"}
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 0.5 }}>
+                          {act.action || "Performed an action"}
+                        </Typography>
+                        {act.comment && (
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              mt: 0.5,
+                              pl: 1,
+                              borderLeft: `3px solid ${theme.palette.primary.main}`,
+                              color: "text.secondary",
+                              fontStyle: "italic",
+                            }}
+                          >
+                            💬 “{act.comment}”
+                          </Typography>
+                        )}
+                      </>
                     }
                     secondary={
                       <Typography variant="caption" color="text.secondary">
-                        {act.actorName || "Unknown"} —{" "}
                         {act.timestamp
                           ? new Date(act.timestamp.toDate()).toLocaleString()
                           : ""}

@@ -16,7 +16,6 @@ import { useAuth } from "./AuthContext.jsx";
 
 const TasksContext = createContext();
 export const useTasks = () => useContext(TasksContext);
-
 export default function TasksProvider({ children }) {
   const { user, role } = useAuth();
   const [tasks, setTasks] = useState([]);

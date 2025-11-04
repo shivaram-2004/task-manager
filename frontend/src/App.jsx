@@ -20,6 +20,8 @@ import Admin from "./pages/Admin.jsx";
 import Settings from "./pages/Settings.jsx";
 import Activity from "./pages/ActivityLog.jsx";
 import UserManagement from "./pages/UserManagement.jsx";
+import TeamsPage from "./pages/TeamsPage.jsx";
+import MemberTeamTasks from "./pages/MemberTeamTasks.jsx";
 
 // 🧭 Role-based dashboards
 import DashboardRouter from "./pages/DashboardRouter.jsx";
@@ -64,39 +66,47 @@ export default function App() {
 
       {/* 🌈 Global Glassmorphic Background */}
       <Box
-        sx={{
-          minHeight: "100vh",
-          width: "100%",
-          background: "rgba(255, 255, 255, 0.1)",
-          WebkitBackdropFilter: "blur(25px)",
-          border: "1px solid rgba(255, 255, 255, 0.3)",
-          backdropFilter: "blur(25px)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          overflowX: "hidden",
-          transition: "background 0.3s ease-in-out",
-        }}
-      >
+          sx={{
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-start",
+            alignItems: "stretch",        // ✅ prevents horizontal shrink
+            minHeight: "100vh",           // ✅ full viewport
+            width: "100%",
+            overflowX: "hidden",
+            background: (theme) =>
+              theme.palette.mode === "dark"
+                ? "linear-gradient(145deg, #0f172a, #1e293b)"
+                : "linear-gradient(145deg, #f8fafc, #e2e8f0)",
+            transition: "background 0.4s ease-in-out",
+          }}
+        >
+
         {/* 🧭 Floating Transparent Navigation Bar */}
         <TopNav />
 
         {/* 💎 Main Container */}
         <Container
-          maxWidth="lg"
-          sx={{
-            py: 4,
-            px: 3,
-            mt: 3,
-            borderRadius: "20px",
-            background: "rgba(255,255,255,0.25)",
-            border: "1px solid rgba(255,255,255,0.4)",
-            boxShadow: "0 8px 32px rgba(31,38,135,0.37)",
-            backdropFilter: "blur(15px)",
-            WebkitBackdropFilter: "blur(15px)",
-          }}
-        >
+            maxWidth="lg"
+            sx={{
+              flex: 1,                     // ✅ fill vertical space
+              py: 4,
+              px: 3,
+              mt: 3,
+              borderRadius: "20px",
+              background: (theme) =>
+                theme.palette.mode === "dark"
+                  ? "rgba(255,255,255,0.08)"
+                  : "rgba(255,255,255,0.6)",
+              border: "1px solid rgba(255,255,255,0.2)",
+              boxShadow: "0 8px 32px rgba(31,38,135,0.37)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              transition: "all 0.3s ease-in-out",
+            }}
+          >
+
           <Routes>
             {/* 🔓 Public Routes */}
             <Route path="/login" element={<Login />} />
@@ -112,6 +122,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            
             {/* 👥 User Management (Admin Only) */}
               <Route
                 path="/users"
@@ -121,6 +132,24 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+
+              <Route
+                path="/teams"
+                element={
+                  <ProtectedRoute roles={["admin"]}>
+                    <TeamsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/team-tasks"
+                element={
+                  <ProtectedRoute roles={["member", "admin"]}>
+                    <MemberTeamTasks />
+                  </ProtectedRoute>
+                }
+              />
+
 
             {/* 📊 Analytics (Admin Only) */}
             <Route

@@ -72,6 +72,7 @@ export default function SharedDashboardLayout({
         minHeight: "100vh",
         px: { xs: 3, md: 4 },
         py: 2,
+        borderRadius: "18px", 
         maxWidth: "100%",
         overflowX: "hidden",
         transition: "background-color 0.3s ease",
@@ -104,11 +105,13 @@ export default function SharedDashboardLayout({
         spacing={2}
         sx={{ mb: 2 }}
       >
-        <FiltersBar
-          filters={filters}
-          onChange={setFilters}
-          onReset={() => setFilters({ q: "", status: "", priority: "" })}
-        />
+       <FiltersBar
+        filters={filters}
+        onChange={setFilters}
+        onReset={() => setFilters({ q: "", status: "", priority: "" })}
+        onNewTask={onNewTask}
+        showCreateButton={showCreateButton && role === "admin"} // ✅ only admin
+      />
 
         <Stack direction="row" spacing={2}>
           {showCreateButton && role === "admin" && (
@@ -142,7 +145,7 @@ export default function SharedDashboardLayout({
       {/* Task Board */}
       {loading ? (
         <Skeleton variant="rounded" height={300} />
-      ) : (
+        ) : (
         <Box
           component={motion.div}
           initial={{ opacity: 0, y: 25 }}
@@ -163,14 +166,27 @@ export default function SharedDashboardLayout({
                 : "0 2px 10px rgba(0,0,0,0.05)",
           }}
         >
-          <TaskBoard
-            tasks={filtered}
-            onUpdate={onUpdate}
-            onDelete={onDelete}
-            onComment={onComment}
-          />
+          {/* ✅ Force left-to-right flexible layout */}
+          <Box
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "flex-start", // align from left
+              alignItems: "flex-start",
+              gap: 2,
+              px: { xs: 1, md: 2 },
+            }}
+          >
+            <TaskBoard
+              tasks={filtered}
+              onUpdate={onUpdate}
+              onDelete={onDelete}
+              onComment={onComment}
+            />
+          </Box>
         </Box>
       )}
+
     </Box>
   );
 }

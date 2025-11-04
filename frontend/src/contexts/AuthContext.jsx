@@ -9,11 +9,18 @@ import { doc, setDoc, getDoc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "../firebaseConfig";
 
 const AuthContext = createContext();
+export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(undefined);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
+// 🔹 Logout function
+const logout = async () => {
+  await signOut(auth);
+  setUser(null);
+  setRole(null);
+};
 
   // 🔹 Signup and store role in Firestore
   const signup = async (email, password, userRole = "member") => {
@@ -27,7 +34,12 @@ export function AuthProvider({ children }) {
       role: userRole,
       createdAt: new Date().toISOString(),
     });
-    setUser(userCred.user);
+    setUser({
+      ...userCred.user,
+      displayName: userCred.user.displayName || email.split("@")[0],
+      name: email.split("@")[0],
+    });
+
     setRole(userRole);
     return userCred;
   };
@@ -63,13 +75,20 @@ export function AuthProvider({ children }) {
 
   // 🔹 Auth state persistence (on refresh)
   useEffect(() => {
+
   const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
     if (firebaseUser) {
-      setUser(firebaseUser);
+      // ✅ Set a clean user object that always has a displayName
+      setUser({
+        ...firebaseUser,
+        displayName: firebaseUser.displayName || firebaseUser.email.split("@")[0],
+        name: firebaseUser.email.split("@")[0],
+      });
+
+      // ✅ Fetch or create user record in Firestore
       const ref = doc(db, "users", firebaseUser.uid);
       let snap = await getDoc(ref);
 
-      // ✅ Create doc if it doesn't exist
       if (!snap.exists()) {
         await setDoc(ref, {
           uid: firebaseUser.uid,
@@ -81,22 +100,18 @@ export function AuthProvider({ children }) {
         snap = await getDoc(ref);
       }
 
+      // ✅ Set role from Firestore
       setRole(snap.data()?.role || "member");
     } else {
       setUser(null);
       setRole(null);
     }
+
     setLoading(false);
   });
+
   return unsubscribe;
 }, []);
-
-
-  const logout = async () => {
-    await signOut(auth);
-    setUser(null);
-    setRole(null);
-  };
 
   return (
     <AuthContext.Provider value={{ user, role, signup, login, logout }}>
@@ -111,4 +126,4 @@ export function AuthProvider({ children }) {
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+

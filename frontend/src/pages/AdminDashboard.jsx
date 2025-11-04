@@ -1,35 +1,39 @@
 import React from "react";
 import {
   Box,
-  Paper,
   Typography,
   Snackbar,
   Alert,
-  Button,
-  Stack,
   useTheme,
+  CircularProgress,
 } from "@mui/material";
-import { motion } from "framer-motion";
 import TaskFormDialog from "../components/TaskFormDialog.jsx";
-import SharedDashboardLayout from "../components/SharedDashboardLayout.jsx";
+import FiltersBar from "../components/FiltersBar.jsx";
+import TaskBoard from "../components/TaskBoard.jsx";
 import { useTasks } from "../contexts/TasksContext.jsx";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip as RTooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
-import { useNavigate } from "react-router-dom"; // ✅ added for navigation
-
+  doc,
+  updateDoc,
+  arrayUnion,
+  addDoc,
+  collection,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../firebaseConfig";
 
 export default function AdminDashboard() {
   const { user, role } = useAuth();
-  const navigate = useNavigate();
-  const { tasks, loading, createTask, updateTask, deleteTask, addComment } =
-    useTasks();
+  const {
+    tasks,
+    setTasks,
+    loading,
+    createTask,
+    updateTask,
+    deleteTask,
+    addComment,
+  } = useTasks();
+
   const theme = useTheme();
 
   const [filters, setFilters] = React.useState({
@@ -49,6 +53,69 @@ export default function AdminDashboard() {
 
   const showAlert = (message, severity = "success") => {
     setAlert({ open: true, message, severity });
+  };
+
+  // ✅ Comment handler
+  const handleComment = async (taskId, text) => {
+    if (!text.trim()) return;
+
+    try {
+      const taskRef = doc(db, "tasks", taskId);
+      const task = tasks.find((t) => t.id === taskId);
+      const title = task?.title || "Untitled Task";
+      const actorName =
+        user?.displayName ||
+        user?.name ||
+        user?.email?.split("@")[0] ||
+        "Unknown User";
+
+      await updateDoc(taskRef, {
+        comments: arrayUnion({
+          id: Date.now().toString(),
+          text,
+          authorName: actorName,
+          authorEmail: user?.email,
+          createdAt: new Date().toISOString(),
+        }),
+      });
+
+      await addDoc(collection(db, "activityLogs"), {
+        action: "Added a comment",
+        actorName,
+        actorEmail: user?.email,
+        taskTitle: title,
+        comment: text,
+        type: "commented",
+        timestamp: Timestamp.now(),
+      });
+
+      showAlert("💬 Comment added successfully!");
+
+      if (setTasks) {
+        setTasks((prev) =>
+          prev.map((t) =>
+            t.id === taskId
+              ? {
+                  ...t,
+                  comments: [
+                    ...(Array.isArray(t.comments) ? t.comments : []),
+                    {
+                      id: Date.now().toString(),
+                      text,
+                      authorName: actorName,
+                      authorEmail: user?.email,
+                      createdAt: new Date().toISOString(),
+                    },
+                  ],
+                }
+              : t
+          )
+        );
+      }
+    } catch (err) {
+      console.error("❌ Error adding comment:", err);
+      showAlert("❌ Failed to add comment", "error");
+    }
   };
 
   const handleTaskSubmit = async (values) => {
@@ -84,45 +151,82 @@ export default function AdminDashboard() {
       await deleteTask(id);
       showAlert("🗑 Task deleted successfully!");
     } catch (err) {
+      console.error("Failed to delete task:", err);
       showAlert("❌ Failed to delete task.", "error");
     }
   };
 
-  // 📊 Analytics
-  const total = tasks.length;
-  const done = tasks.filter((t) => t.status === "Done").length;
-  const inProgress = tasks.filter((t) => t.status === "In Progress").length;
-  const todo = tasks.filter((t) => t.status === "To Do").length;
+  // ✅ Filter logic
+  const filteredTasks = React.useMemo(() => {
+    return tasks.filter((task) => {
+      const matchQuery = filters.q
+        ? task.title?.toLowerCase().includes(filters.q.toLowerCase()) ||
+          task.description?.toLowerCase().includes(filters.q.toLowerCase())
+        : true;
+      const matchStatus = filters.status ? task.status === filters.status : true;
+      const matchPriority = filters.priority ? task.priority === filters.priority : true;
+      return matchQuery && matchStatus && matchPriority;
+    });
+  }, [tasks, filters]);
 
-  const COLORS = ["#3A5FCD", "#6A8FE7", "#C8D6F7"];
-  const chartData = [
-    { name: "Done", value: done },
-    { name: "In Progress", value: inProgress },
-    { name: "To Do", value: todo },
-  ];
+  if (loading)
+    return (
+      <Box
+        sx={{
+          height: "80vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
 
   return (
-    <>
-      {/* 🔹 Main Task Layout */}
-      <SharedDashboardLayout
-        user={user}
-        role={role}
+    <Box
+      sx={{
+        width: "100%",
+        minHeight: "100vh",
+        px: { xs: 2, md: 4 },
+        py: 4,
+        background:
+          theme.palette.mode === "dark"
+            ? "linear-gradient(180deg,#0a0a0a,#1a1a1a)"
+            : "linear-gradient(180deg,#f9fafb,#f3f4f6)",
+      }}
+    >
+      {/* Greeting */}
+      <Typography
+        variant="h5"
+        sx={{
+          mb: 2,
+          fontWeight: 700,
+          color: theme.palette.mode === "dark" ? "#e5e7eb" : "#111827",
+        }}
+      >
+        Good Evening, {user?.name || "Admin"} 👋
+      </Typography>
+
+      {/* 🔹 Filter Bar */}
+      <FiltersBar
         filters={filters}
         setFilters={setFilters}
-        tasks={tasks}
-        loading={loading}
-        onUpdate={handleEditTask}
-        onDelete={handleDeleteTask}
-        onComment={addComment}
-        onNewTask={handleNewTask}
-        showCreateButton={true}
-        // ✅ Pass Activity Log button here
-       
+        onReset={() => setFilters({ q: "", status: "", priority: "" })}
+        onNewTask={handleNewTask}           // ✅ add this
+        showCreateButton={role === "admin"} // ✅ only show for admin
       />
 
 
+      {/* 🔹 Task Grid */}
+      <TaskBoard
+        tasks={filteredTasks}
+        onUpdate={handleEditTask}
+        onDelete={handleDeleteTask}
+        onComment={handleComment}
+      />
 
-      {/* 🔹 Create/Edit Dialog */}
+      {/* 🔹 Create/Edit Task Form */}
       <TaskFormDialog
         open={dialogOpen}
         onClose={() => {
@@ -142,44 +246,7 @@ export default function AdminDashboard() {
         onSubmit={handleTaskSubmit}
       />
 
-      {/* 🔹 Analytics */}
-      {!loading && total > 0 && (
-        <Box
-          component={motion.div}
-          initial={{ opacity: 0, y: 25 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          sx={{
-            mt: 6,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <Paper
-            elevation={0}
-            sx={{
-              p: 4,
-              width: "480px",
-              borderRadius: 4,
-              backgroundColor:
-                theme.palette.mode === "dark"
-                  ? "rgba(30,30,40,0.6)"
-                  : "rgba(255,255,255,0.35)",
-              backdropFilter: "blur(15px)",
-              boxShadow:
-                theme.palette.mode === "dark"
-                  ? "0 8px 25px rgba(0,0,0,0.4)"
-                  : "0 8px 20px rgba(0,0,0,0.1)",
-              textAlign: "center",
-            }}
-          >
-          
-            
-          </Paper>
-        </Box>
-      )}
-
-      {/* 🔹 Snackbar Notifications */}
+      {/* 🔹 Snackbar */}
       <Snackbar
         open={alert.open}
         autoHideDuration={4000}
@@ -211,6 +278,6 @@ export default function AdminDashboard() {
           {alert.message}
         </Alert>
       </Snackbar>
-    </>
+    </Box>
   );
 }

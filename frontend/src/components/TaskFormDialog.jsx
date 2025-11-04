@@ -8,7 +8,6 @@ import {
   TextField,
   Stack,
   MenuItem,
-  Typography,
   FormControl,
   InputLabel,
   Select,
@@ -21,6 +20,7 @@ import { motion } from "framer-motion";
 import { db } from "../firebaseConfig";
 import { collection, getDocs } from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext.jsx";
+import { useTeams } from "../contexts/TeamsContext.jsx";
 
 export default function TaskFormDialog({
   open,
@@ -29,58 +29,68 @@ export default function TaskFormDialog({
   defaultValues = {},
 }) {
   const { role } = useAuth();
+  const { teams } = useTeams();
 
-  const [values, setValues] = React.useState({
+  // ✅ Stable initial state
+  const initialFormState = {
     title: "",
     description: "",
     assignedToEmails: [],
     status: "To Do",
     priority: "Medium",
     dueDate: "",
-  });
+    teamId: "",
+  };
 
+  const [values, setValues] = React.useState(initialFormState);
   const [isValid, setIsValid] = React.useState(false);
   const [loadingUsers, setLoadingUsers] = React.useState(false);
   const [registeredUsers, setRegisteredUsers] = React.useState([]);
 
-  // 🔹 Fetch all registered users for dropdown
+  // 🔹 Fetch users only once when mounted
   React.useEffect(() => {
-    if (role === "admin") {
-      const fetchUsers = async () => {
+    let active = true;
+    const fetchUsers = async () => {
+      if (role !== "admin") return;
+      try {
         setLoadingUsers(true);
-        try {
-          const snap = await getDocs(collection(db, "users"));
-          const userList = snap.docs.map((doc) => doc.data().email);
-          setRegisteredUsers(userList);
-        } catch (err) {
-          console.error("Error fetching users:", err);
-        } finally {
-          setLoadingUsers(false);
-        }
-      };
-      fetchUsers();
-    }
-  }, [role]);
+        const snap = await getDocs(collection(db, "users"));
+        const userList = snap.docs.map((doc) => doc.data().email);
+        if (active) setRegisteredUsers(userList);
+      } catch (err) {
+        console.error("Error fetching users:", err);
+      } finally {
+        if (active) setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+    return () => {
+      active = false;
+    };
+  }, []); // ✅ only once
 
-  // 🔁 Load form data (for editing)
+  // 🔁 Sync default values when dialog opens or edit mode
   React.useEffect(() => {
-    setValues({
-      title: defaultValues?.title || "",
-      description: defaultValues?.description || "",
-      assignedToEmails: defaultValues?.assignedToEmails || [],
-      status: defaultValues?.status || "To Do",
-      priority: defaultValues?.priority || "Medium",
-      dueDate: defaultValues?.dueDate || "",
-    });
-  }, [defaultValues]);
+    if (!open) return; // only run when dialog is open
+    if (!defaultValues || Object.keys(defaultValues).length === 0) {
+      setValues(initialFormState); // reset for new task
+    } else {
+      // only update if changed
+      setValues((prev) => {
+        const changed = Object.keys(defaultValues).some(
+          (k) => defaultValues[k] !== prev[k]
+        );
+        return changed ? { ...prev, ...defaultValues } : prev;
+      });
+    }
+  }, [open, defaultValues]); // ✅ only when opening or switching edit mode
 
-  // 🧩 Handle field change
+  // 🧩 Field change handlers
   const handleChange = (e) => {
     const { name, value } = e.target;
     setValues((prev) => ({ ...prev, [name]: value }));
   };
 
-  // 🧩 Handle user multi-select change
   const handleAssignChange = (event) => {
     const {
       target: { value },
@@ -91,24 +101,37 @@ export default function TaskFormDialog({
     }));
   };
 
-  // ✅ Validate form
+  // ✅ Form validation
   React.useEffect(() => {
-    const { title, description, assignedToEmails, dueDate } = values;
-    const valid =
-      title.trim() &&
-      description.trim() &&
-      Array.isArray(assignedToEmails) &&
-      assignedToEmails.length > 0 &&
-      dueDate;
-    setIsValid(Boolean(valid));
-  }, [values]);
+    const { title, description, dueDate } = values;
+    const valid = Boolean(title.trim() && description.trim() && dueDate);
+    if (isValid !== valid) setIsValid(valid);
+  }, [values, isValid]);
 
-  // 🧾 Submit form
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isValid) return;
-    await onSubmit(values);
+
+    // Fetch full user info (name + email)
+    const usersSnap = await getDocs(collection(db, "users"));
+    const userData = usersSnap.docs.map((doc) => doc.data());
+
+    const enrichedAssignees = values.assignedToEmails.map((email) => {
+      const userInfo = userData.find((u) => u.email === email);
+      return {
+        email,
+        name: userInfo?.name || email.split("@")[0],
+      };
+    });
+
+    const updatedValues = {
+      ...values,
+      assignedTo: enrichedAssignees, // ✅ New field
+    };
+
+    await onSubmit(updatedValues);
   };
+
 
   return (
     <Dialog
@@ -151,8 +174,29 @@ export default function TaskFormDialog({
               fullWidth
             />
 
-            {/* 👥 Multi-select for registered users */}
-            <FormControl fullWidth required>
+            {/* ✅ Team Selection */}
+            {role === "admin" && (
+              <FormControl fullWidth>
+                <InputLabel id="team-select-label">Team</InputLabel>
+                <Select
+                  labelId="team-select-label"
+                  name="teamId"
+                  value={values.teamId || ""}
+                  onChange={handleChange}
+                  input={<OutlinedInput label="Team" />}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {teams.map((t) => (
+                    <MenuItem key={t.id} value={t.id}>
+                      {t.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+
+            {/* 👥 Assign Users */}
+            <FormControl fullWidth>
               <InputLabel id="assign-users-label">Assign To Users</InputLabel>
               {loadingUsers ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
@@ -174,15 +218,20 @@ export default function TaskFormDialog({
                     </Box>
                   )}
                 >
-                  {registeredUsers.map((email) => (
-                    <MenuItem key={email} value={email}>
-                      {email}
-                    </MenuItem>
-                  ))}
+                  {registeredUsers.length > 0 ? (
+                    registeredUsers.map((email) => (
+                      <MenuItem key={email} value={email}>
+                        {email}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem disabled>No registered users</MenuItem>
+                  )}
                 </Select>
               )}
             </FormControl>
 
+            {/* 🔸 Status + Priority */}
             <Stack direction="row" spacing={2}>
               <TextField
                 select
@@ -215,6 +264,7 @@ export default function TaskFormDialog({
               </TextField>
             </Stack>
 
+            {/* 🗓 Due Date */}
             <TextField
               label="Due Date"
               name="dueDate"
@@ -225,10 +275,9 @@ export default function TaskFormDialog({
               InputLabelProps={{ shrink: true }}
               required
               inputProps={{
-                min: new Date().toISOString().split("T")[0], // 🔹 Disables past dates
+                min: new Date().toISOString().split("T")[0],
               }}
             />
-
           </Stack>
         </DialogContent>
 

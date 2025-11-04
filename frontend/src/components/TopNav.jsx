@@ -13,6 +13,8 @@ import {
   ListItemButton,
   ListItemText,
   useMediaQuery,
+  Divider,
+  Avatar,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -22,6 +24,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import SettingsIcon from "@mui/icons-material/Settings";
 import MenuIcon from "@mui/icons-material/Menu";
 import CloseIcon from "@mui/icons-material/Close";
+import GroupsIcon from "@mui/icons-material/Groups";
 import { Link as RouterLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import { useColorMode } from "../theme";
@@ -41,15 +44,31 @@ export default function TopNav() {
   };
 
   const navItems = [
-    { label: "Dashboard", path: "/", icon: <DashboardIcon /> },
-    ...(role === "admin"
-      ? [
-          { label: "Activity Log", path: "/activity" },
-          { label: "Users", path: "/users" },
-          { label: "Analytics", path: "/analytics" },
-        ]
-      : []),
-  ];
+      { label: "Dashboard", path: "/", icon: <DashboardIcon /> },
+
+      // 👥 Admin-only routes
+      ...(role === "admin"
+        ? [
+            { label: "Activity Log", path: "/activity" },
+            { label: "Users", path: "/users" },
+            { label: "Teams", path: "/teams", icon: <GroupsIcon /> },
+            { label: "Analytics", path: "/analytics" },
+          ]
+        : []),
+
+      // 👤 Member-only routes
+      ...(role === "member"
+        ? [
+            {
+              label: "Team Tasks",
+              path: "/team-tasks",
+              icon: <GroupsIcon />, // reuse the same icon for teams
+            },
+          ]
+        : []),
+    ];
+
+
 
   return (
     <AppBar
@@ -132,18 +151,25 @@ export default function TopNav() {
         {/* 🧭 Desktop Navigation */}
         {!isMobile && user && (
           <Stack direction="row" spacing={1.2} alignItems="center">
-            {navItems.map((item) => (
+            {navItems.map(({ label, path, icon }) => (
               <Button
-                key={item.label}
-                color="inherit"
-                startIcon={item.icon}
+                key={label}
                 component={RouterLink}
-                to={item.path}
-                sx={navBtnStyle(mode)}
+                to={path}
+                color="inherit"
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                }}
               >
-                {item.label}
+                {icon}
+                {label}
               </Button>
             ))}
+
 
             <Typography
               variant="body2"
@@ -167,7 +193,7 @@ export default function TopNav() {
           </Stack>
         )}
 
-        {/* 📱 Mobile Navigation */}
+        {/* 📱 Modern Mobile Navigation */}
         {isMobile && user && (
           <>
             <IconButton onClick={() => setOpenDrawer(true)} sx={iconStyle(mode)}>
@@ -180,30 +206,50 @@ export default function TopNav() {
               onClose={() => setOpenDrawer(false)}
               PaperProps={{
                 sx: {
-                  width: "75%",
+                  width: "80%",
                   background:
                     mode === "dark"
-                      ? "rgba(20,20,25,0.95)"
-                      : "rgba(255,255,255,0.95)",
-                  p: 2,
+                      ? "linear-gradient(135deg, #111827, #1e293b)"
+                      : "linear-gradient(135deg, #f8fafc, #e0f2fe)",
+                  color: mode === "dark" ? "#f1f5f9" : "#1e293b",
+                  borderTopLeftRadius: "16px",
+                  borderBottomLeftRadius: "16px",
+                  p: 3,
                 },
               }}
             >
+              {/* Header with user info */}
               <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Typography
-                  variant="h6"
-                  sx={{
-                    fontWeight: 600,
-                    color: mode === "dark" ? "#e5e7eb" : "#1e1e1e",
-                  }}
-                >
-                  Menu
-                </Typography>
-                <IconButton onClick={() => setOpenDrawer(false)}>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Avatar
+                    sx={{
+                      bgcolor:
+                        mode === "dark" ? "primary.light" : "primary.main",
+                      color: "#fff",
+                    }}
+                  >
+                    {user?.name?.[0]?.toUpperCase() || "U"}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {user?.name || "User"}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: mode === "dark" ? "#94a3b8" : "#475569" }}
+                    >
+                      {user?.email}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <IconButton onClick={() => setOpenDrawer(false)} sx={{ color: "inherit" }}>
                   <CloseIcon />
                 </IconButton>
               </Stack>
 
+              <Divider sx={{ my: 2, opacity: 0.3 }} />
+
+              {/* Navigation Items */}
               <List>
                 {navItems.map((item) => (
                   <ListItem key={item.label} disablePadding>
@@ -212,20 +258,47 @@ export default function TopNav() {
                         navigate(item.path);
                         setOpenDrawer(false);
                       }}
+                      sx={{
+                        borderRadius: "12px",
+                        mb: 1,
+                        transition: "all 0.3s ease",
+                        "&:hover": {
+                          background:
+                            mode === "dark"
+                              ? "rgba(96,165,250,0.15)"
+                              : "rgba(59,130,246,0.15)",
+                          transform: "translateX(4px)",
+                        },
+                      }}
                     >
+                      <Box sx={{ mr: 2, color: "#3b82f6" }}>{item.icon}</Box>
                       <ListItemText primary={item.label} />
                     </ListItemButton>
                   </ListItem>
                 ))}
+
+                <Divider sx={{ my: 2, opacity: 0.3 }} />
+
                 <ListItemButton onClick={toggleColorMode}>
+                  <Box sx={{ mr: 2 }}>
+                    {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+                  </Box>
                   <ListItemText
                     primary={mode === "dark" ? "Light Mode" : "Dark Mode"}
                   />
                 </ListItemButton>
+
                 <ListItemButton onClick={() => navigate("/settings")}>
+                  <Box sx={{ mr: 2 }}>
+                    <SettingsIcon />
+                  </Box>
                   <ListItemText primary="Settings" />
                 </ListItemButton>
+
                 <ListItemButton onClick={handleLogout}>
+                  <Box sx={{ mr: 2 }}>
+                    <LogoutIcon />
+                  </Box>
                   <ListItemText primary="Logout" />
                 </ListItemButton>
               </List>
