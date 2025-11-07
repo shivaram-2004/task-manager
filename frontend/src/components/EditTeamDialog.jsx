@@ -16,16 +16,16 @@ import {
   CircularProgress,
   Box,
 } from "@mui/material";
-import { collection, getDocs, updateDoc, doc } from "firebase/firestore";
+import { collection, getDocs, updateDoc, doc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebaseConfig";
 
 export default function EditTeamDialog({ open, onClose, team }) {
   const [teamName, setTeamName] = useState(team?.name || "");
-  const [members, setMembers] = useState(team?.members || []);
+  const [members, setMembers] = useState([]); // always lowercase strings
   const [allUsers, setAllUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
 
-  // 🧩 Fetch all users from Firestore
+  // 🧩 Fetch all users
   useEffect(() => {
     const fetchUsers = async () => {
       setLoadingUsers(true);
@@ -33,36 +33,42 @@ export default function EditTeamDialog({ open, onClose, team }) {
         const snapshot = await getDocs(collection(db, "users"));
         const users = snapshot.docs.map((d) => ({
           id: d.id,
-          email: d.data().email,
+          email: (d.data().email || "").toLowerCase(),
           name: d.data().name || "",
         }));
         setAllUsers(users);
       } catch (err) {
-        console.error("Error fetching users:", err);
+        console.error("❌ Error fetching users:", err);
       } finally {
         setLoadingUsers(false);
       }
     };
-
     if (open) fetchUsers();
   }, [open]);
 
-  // 🧩 Handle member selection
+  // 🧩 Reset data on open
+  useEffect(() => {
+    if (team) {
+      const normalized = (team.members || []).map((m) =>
+        typeof m === "string" ? m.toLowerCase() : (m.email || "").toLowerCase()
+      );
+      setTeamName(team.name || "");
+      setMembers([...new Set(normalized)]); // remove duplicates
+    }
+  }, [team]);
+
+  // 🧩 Handle change
   const handleMemberChange = (event) => {
-    const {
-      target: { value },
-    } = event;
-    // Ensure all values are unique and consistent (as objects)
-    const selected = value.map((m) =>
-      typeof m === "string" ? { email: m } : m
-    );
-    setMembers(selected);
+    const { value } = event.target;
+    // Ensure only strings (emails) and remove duplicates
+    const clean = value.map((m) => m.toLowerCase());
+    setMembers([...new Set(clean)]);
   };
 
-  // 🧩 Save updates
+  // 🧩 Save team
   const handleSave = async () => {
-    if (!teamName.trim()) {
-      alert("Team name cannot be empty");
+    if (!teamName.trim() || members.length === 0) {
+      alert("Please enter a team name and select at least one member.");
       return;
     }
 
@@ -70,27 +76,22 @@ export default function EditTeamDialog({ open, onClose, team }) {
       const teamRef = doc(db, "teams", team.id);
       await updateDoc(teamRef, {
         name: teamName.trim(),
-        members: members,
+        members: [...new Set(members.map((m) => m.toLowerCase()))],
+        updatedAt: serverTimestamp(),
       });
+
       alert("✅ Team updated successfully!");
       onClose();
     } catch (err) {
-      console.error("Error updating team:", err);
-      alert("❌ Failed to update team");
+      console.error("❌ Error updating team:", err);
+      alert("Failed to update team.");
     }
   };
-
-  // 🧩 Reset form when dialog opens
-  useEffect(() => {
-    if (team) {
-      setTeamName(team.name || "");
-      setMembers(team.members || []);
-    }
-  }, [team]);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Edit Team</DialogTitle>
+
       <DialogContent dividers>
         <Stack spacing={3}>
           {/* Team Name */}
@@ -117,24 +118,17 @@ export default function EditTeamDialog({ open, onClose, team }) {
                 input={<OutlinedInput label="Team Members" />}
                 renderValue={(selected) => (
                   <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-                    {selected.map((m, idx) => (
-                      <Chip
-                        key={m.email || idx}
-                        label={
-                          typeof m === "string"
-                            ? m
-                            : m.email || m.name || JSON.stringify(m)
-                        }
-                        color="info"
-                      />
+                    {selected.map((email) => (
+                      <Chip key={email} label={email} color="info" />
                     ))}
                   </Box>
                 )}
               >
                 {allUsers.map((user) => (
                   <MenuItem
-                    key={user.email} // ✅ Unique key
-                    value={{ email: user.email, name: user.name }}
+                    key={user.email}
+                    value={user.email}
+                    disabled={members.includes(user.email)}
                   >
                     {user.name
                       ? `${user.name} (${user.email})`

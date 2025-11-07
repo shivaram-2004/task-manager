@@ -65,17 +65,11 @@ export default function SharedDashboardLayout({
   return (
     <Box
       sx={{
-        backgroundColor:
-          theme.palette.mode === "dark"
-            ? theme.palette.background.default
-            : "#F8FAFD",
         minHeight: "100vh",
         px: { xs: 3, md: 4 },
         py: 2,
-        borderRadius: "18px", 
         maxWidth: "100%",
         overflowX: "hidden",
-        transition: "background-color 0.3s ease",
       }}
     >
       {/* Greeting */}
@@ -85,10 +79,7 @@ export default function SharedDashboardLayout({
           fontWeight: 700,
           letterSpacing: 0.5,
           mb: 1.5,
-          color:
-            theme.palette.mode === "dark"
-              ? theme.palette.text.primary
-              : "#3A5FCD",
+          color: theme.palette.text.primary,
         }}
       >
         {greeting}, {userName} 👋
@@ -127,7 +118,7 @@ export default function SharedDashboardLayout({
                   theme.palette.mode === "dark"
                     ? "linear-gradient(90deg,#2563eb,#60a5fa)"
                     : "linear-gradient(90deg,#22c55e,#4ade80)",
-                "&:hover": {
+                 "&:hover": {
                   background:
                     theme.palette.mode === "dark"
                       ? "linear-gradient(90deg,#1d4ed8,#3b82f6)"
@@ -154,16 +145,6 @@ export default function SharedDashboardLayout({
           sx={{
             mt: 0,
             p: { xs: 1, md: 1.5 },
-            borderRadius: 3,
-            backgroundColor:
-              theme.palette.mode === "dark"
-                ? theme.palette.background.paper
-                : "#FFFFFF",
-            color: theme.palette.text.primary,
-            boxShadow:
-              theme.palette.mode === "dark"
-                ? "0 2px 12px rgba(255,255,255,0.05)"
-                : "0 2px 10px rgba(0,0,0,0.05)",
           }}
         >
           {/* ✅ Force left-to-right flexible layout */}

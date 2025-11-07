@@ -10,6 +10,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { useAuth } from "./AuthContext"; // add this import at top
 
 const TeamsContext = createContext();
 
@@ -17,6 +18,7 @@ export function TeamsProvider({ children }) {
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]); // ✅ all available users for selection
   const [loading, setLoading] = useState(false);
+  const { user } = useAuth();
 
   // 🔹 Fetch all teams
   const fetchTeams = async () => {
@@ -126,9 +128,10 @@ export function TeamsProvider({ children }) {
 
   // 🔹 Auto fetch on mount
   useEffect(() => {
-    fetchTeams();
-    fetchUsers();
-  }, []);
+  if (!user) return; // 🔒 don't fetch until logged in
+  fetchTeams();
+  fetchUsers();
+}, [user]);
 
   return (
     <TeamsContext.Provider

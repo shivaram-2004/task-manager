@@ -54,7 +54,8 @@ export default function TaskBoard({ tasks, onUpdate, onDelete, onComment }) {
   return (
     <Box
       sx={{
-        width: "96%", // ✅ matches TopNav width
+        width: "100%",
+        maxWidth: "1600px",      // optional limit
         mx: "auto",
         py: 4,
         px: { xs: 1, sm: 2, md: 3 },
@@ -64,7 +65,6 @@ export default function TaskBoard({ tasks, onUpdate, onDelete, onComment }) {
         alignItems: "stretch",
         gap: 3,
         color: theme.palette.text.primary,
-        backgroundColor: theme.palette.background.default,
         transition: "width 0.3s ease, background-color 0.3s ease",
         borderRadius: "18px",
       }}
@@ -90,16 +90,22 @@ export default function TaskBoard({ tasks, onUpdate, onDelete, onComment }) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
-            sx={{
-              flex: "1 1 calc(25% - 24px)", // ✅ 4 cards per row
-              minWidth: "300px",
+           sx={{
+              flex: {
+                xs: "1 1 100%",       // 1 per row (mobile)
+                sm: "1 1 calc(50% - 24px)", // 2 per row (tablet)
+                md: "1 1 calc(33.33% - 24px)", // 3 per row (small desktop)
+                lg: "1 1 calc(25% - 24px)",    // 4 per row (large desktop)
+              },
+              minWidth: "280px",
               display: "flex",
-              justifyContent: "center",
+              justifyContent: "flex-start",
               transition: "transform 0.3s ease",
               "&:hover": {
                 transform: "translateY(-4px)",
               },
             }}
+
           >
             <TaskCard
               task={task}

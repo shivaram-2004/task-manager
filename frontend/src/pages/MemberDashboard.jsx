@@ -151,7 +151,7 @@ const StatusCard = ({ label, count, color, icon: Icon, isDark, progress }) => (
 
 export default function MemberDashboard() {
   const { user } = useAuth();
-  const { tasks, setTasks, loading } = useTasks();
+  const { tasks, loading, addComment } = useTasks();
   const { teams } = useTeams();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -400,7 +400,7 @@ export default function MemberDashboard() {
           : "linear-gradient(145deg, #f8f9fa 0%, #e9ecef 100%)",
         pb: 4,
       }}
-    >
+     >
       <Container maxWidth="xl" sx={{ pt: { xs: 2, sm: 3, md: 4 }, px: { xs: 2, sm: 3, md: 4 } }}>
         {/* Header Section */}
         

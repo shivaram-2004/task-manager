@@ -38,49 +38,66 @@ export default function TasksProvider({ children }) {
   };
 
   // ✅ Real-time fetch (admin → all tasks; member → assigned only)
- useEffect(() => {
-  if (!user) {
-    setTasks([]);
-    return;
-  }
-
-  setLoading(true);
-  const tasksRef = collection(db, "tasks");
-
-  if (role === "admin") {
-    const q = query(tasksRef, orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  useEffect(() => {
+    // 🔒 wait until both user and role are ready
+    if (!user || !role) {
+      setTasks([]);
       setLoading(false);
-    });
-    return () => unsub();
-  } else {
-    // ✅ Combine both queries cleanly
-    const q1 = query(tasksRef, where("assignedToEmails", "array-contains", user.email));
-    const q2 = query(tasksRef, where("assignedToEmail", "==", user.email));
+      return;
+    }
 
-    const unsub1 = onSnapshot(q1, (snap1) => {
-      const list1 = snap1.docs.map((d) => ({ id: d.id, ...d.data() }));
+    setLoading(true);
+    const tasksRef = collection(db, "tasks");
+    let unsubscribeAll = () => {};
 
-      const unsub2 = onSnapshot(q2, (snap2) => {
-        const list2 = snap2.docs.map((d) => ({ id: d.id, ...d.data() }));
+    if (role === "admin") {
+      const q = query(tasksRef, orderBy("createdAt", "desc"));
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          setLoading(false);
+        },
+        (err) => {
+          console.error("🔥 Firestore (admin tasks) error:", err);
+          setLoading(false);
+        }
+      );
+      unsubscribeAll = unsub;
+    } else {
+      const q1 = query(tasksRef, where("assignedToEmails", "array-contains", user.email));
+      const q2 = query(tasksRef, where("assignedToEmail", "==", user.email));
 
-        // ✅ Merge unique by id
-        const merged = [...list1, ...list2].filter(
-          (v, i, a) => a.findIndex((t) => t.id === v.id) === i
-        );
-        setTasks(merged);
-        setLoading(false);
-      });
+      const unsub1 = onSnapshot(
+        q1,
+        (snap1) => {
+          const list1 = snap1.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-      // cleanup both properly
-      return () => unsub2();
-    });
+          const unsub2 = onSnapshot(
+            q2,
+            (snap2) => {
+              const list2 = snap2.docs.map((d) => ({ id: d.id, ...d.data() }));
+              const merged = [...list1, ...list2].filter(
+                (v, i, a) => a.findIndex((t) => t.id === v.id) === i
+              );
+              setTasks(merged);
+              setLoading(false);
+            },
+            (err) => console.error("🔥 Firestore (member q2) error:", err)
+          );
 
-    // full cleanup
-    return () => unsub1();
-  }
-}, [user, role]);
+          unsubscribeAll = () => {
+            unsub1();
+            unsub2();
+          };
+        },
+        (err) => console.error("🔥 Firestore (member q1) error:", err)
+      );
+    }
+
+    return () => unsubscribeAll();
+  }, [user, role]);
+
 
 
 
